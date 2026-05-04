@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gridiron Legends</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #0b5;
+      color: white;
+      text-align: center;
+    }
+    canvas {
+      background: #0a3;
+      display: block;
+      margin: auto;
+      border: 4px solid white;
+    }
+    #menu {
+      margin-top: 40px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>🏈 Gridiron Legends</h1>
+  <p>Select Your Team</p>
+  <div id="teams"></div>
+</div>
+
+<canvas id="game" width="800" height="400" style="display:none;"></canvas>
+
+<script>
+const TEAMS = [
+  { name: "Metro Hawks", color: "red" },
+  { name: "Iron Wolves", color: "blue" },
+  { name: "Desert Vipers", color: "orange" },
+  { name: "Glacier Titans", color: "cyan" }
+];
+
+let playerTeam = null;
+
+const teamDiv = document.getElementById("teams");
+TEAMS.forEach((team, i) => {
+  const btn = document.createElement("button");
+  btn.innerText = team.name;
+  btn.onclick = () => startGame(i);
+  teamDiv.appendChild(btn);
+});
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let player, defenders, ball, score, time;
+
+function startGame(teamIndex) {
+  playerTeam = TEAMS[teamIndex];
+  document.getElementById("menu").style.display = "none";
+  canvas.style.display = "block";
+
+  player = { x: 100, y: 200, speed: 3 };
+  ball = { x: player.x, y: player.y, vx: 0, vy: 0, thrown: false };
+
+  defenders = [];
+  for (let i = 0; i < 5; i++) {
+    defenders.push({ x: 500 + i*40, y: Math.random()*400 });
+  }
+
+  score = 0;
+  time = 60;
+
+  gameLoop();
+}
+
+const keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+function update() {
+  // movement
+  if (keys["w"]) player.y -= player.speed;
+  if (keys["s"]) player.y += player.speed;
+  if (keys["a"]) player.x -= player.speed;
+  if (keys["d"]) player.x += player.speed;
+
+  // throw ball
+  if (keys[" "] && !ball.thrown) {
+    ball.vx = 6;
+    ball.vy = 0;
+    ball.thrown = true;
+  }
+
+  if (!ball.thrown) {
+    ball.x = player.x;
+    ball.y = player.y;
+  } else {
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+  }
+
+  // defenders chase
+  defenders.forEach(d => {
+    if (d.x > player.x) d.x -= 1.5;
+    if (d.y < player.y) d.y += 1.5;
+    if (d.y > player.y) d.y -= 1.5;
+
+    // tackle
+    if (Math.abs(d.x - player.x) < 10 && Math.abs(d.y - player.y) < 10) {
+      resetPlay();
+    }
+  });
+
+  // touchdown
+  if (player.x > 750) {
+    score += 7;
+    resetPlay();
+  }
+
+  time -= 1/60;
+  if (time <= 0) {
+    alert("Game Over! Score: " + score);
+    location.reload();
+  }
+}
+
+function resetPlay() {
+  player.x = 100;
+  player.y = 200;
+  ball.thrown = false;
+}
+
+function draw() {
+  ctx.clearRect(0,0,800,400);
+
+  // field
+  ctx.fillStyle = "#0a3";
+  ctx.fillRect(0,0,800,400);
+
+  // player
+  ctx.fillStyle = playerTeam.color;
+  ctx.fillRect(player.x, player.y, 10, 10);
+
+  // ball
+  ctx.fillStyle = "brown";
+  ctx.fillRect(ball.x, ball.y, 5, 5);
+
+  // defenders
+  ctx.fillStyle = "white";
+  defenders.forEach(d => ctx.fillRect(d.x, d.y, 10, 10));
+
+  // UI
+  ctx.fillStyle = "white";
+  ctx.fillText("Score: " + score, 10, 20);
+  ctx.fillText("Time: " + Math.floor(time), 10, 40);
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+</script>
+
+</body>
+</html>
