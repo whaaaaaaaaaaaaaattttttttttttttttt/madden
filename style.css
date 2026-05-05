@@ -3,37 +3,57 @@ body {
   font-family:Arial;
   background:#0a5;
   color:white;
+  overflow:hidden;
 }
 
 .screen {
+  display:none;
   position:absolute;
   width:100%;
   height:100%;
-  display:flex;
   flex-direction:column;
-  justify-content:center;
   align-items:center;
-  transition:0.3s;
+  justify-content:center;
 }
 
-.hidden {
-  display:none;
+.active {
+  display:flex;
 }
 
 button {
-  width:220px;
-  padding:15px;
+  width:240px;
+  padding:14px;
   margin:8px;
   border:none;
+  border-radius:10px;
   background:#0c8;
   color:white;
   font-size:16px;
-  border-radius:10px;
-  cursor:pointer;
+}
+
+.back {
+  background:#444;
 }
 
 canvas {
-  background:#083;
   width:100%;
   height:70%;
+  background:#083;
+}
+
+.panel {
+  width:90%;
+  max-width:500px;
+  background:rgba(0,0,0,0.3);
+  padding:10px;
+  border-radius:10px;
+}
+
+.item {
+  display:flex;
+  justify-content:space-between;
+  padding:8px;
+  margin:5px 0;
+  background:rgba(255,255,255,0.1);
+  border-radius:6px;
 }
