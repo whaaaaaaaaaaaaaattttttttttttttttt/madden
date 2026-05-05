@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gridiron Legends</title>
+  <title>Gridiron Legends v2</title>
   <style>
     body {
       margin: 0;
@@ -30,12 +30,12 @@
 <body>
 
 <div id="menu">
-  <h1>🏈 Gridiron Legends</h1>
+  <h1>🏈 Gridiron Legends v2</h1>
   <p>Select Your Team</p>
   <div id="teams"></div>
 </div>
 
-<canvas id="game" width="800" height="400" style="display:none;"></canvas>
+<canvas id="game" width="900" height="400" style="display:none;"></canvas>
 
 <script>
 const TEAMS = [
@@ -58,25 +58,36 @@ TEAMS.forEach((team, i) => {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let player, defenders, ball, score, time;
+let player, defenders, ball;
+let score, time;
+let down, yardsToGo, lineOfScrimmage, firstDownLine;
 
 function startGame(teamIndex) {
   playerTeam = TEAMS[teamIndex];
   document.getElementById("menu").style.display = "none";
   canvas.style.display = "block";
 
+  initDrive();
+
+  score = 0;
+  time = 120;
+
+  gameLoop();
+}
+
+function initDrive() {
   player = { x: 100, y: 200, speed: 3 };
   ball = { x: player.x, y: player.y, vx: 0, vy: 0, thrown: false };
 
   defenders = [];
-  for (let i = 0; i < 5; i++) {
-    defenders.push({ x: 500 + i*40, y: Math.random()*400 });
+  for (let i = 0; i < 6; i++) {
+    defenders.push({ x: 400 + i*50, y: Math.random()*400 });
   }
 
-  score = 0;
-  time = 60;
-
-  gameLoop();
+  down = 1;
+  yardsToGo = 100;
+  lineOfScrimmage = 100;
+  firstDownLine = lineOfScrimmage + 100;
 }
 
 const keys = {};
@@ -84,15 +95,15 @@ document.addEventListener("keydown", e => keys[e.key] = true);
 document.addEventListener("keyup", e => keys[e.key] = false);
 
 function update() {
-  // movement
+  // Player movement
   if (keys["w"]) player.y -= player.speed;
   if (keys["s"]) player.y += player.speed;
   if (keys["a"]) player.x -= player.speed;
   if (keys["d"]) player.x += player.speed;
 
-  // throw ball
+  // Throw ball
   if (keys[" "] && !ball.thrown) {
-    ball.vx = 6;
+    ball.vx = 7;
     ball.vy = 0;
     ball.thrown = true;
   }
@@ -102,63 +113,108 @@ function update() {
     ball.y = player.y;
   } else {
     ball.x += ball.vx;
-    ball.y += ball.vy;
   }
 
-  // defenders chase
+  // DEFENSE (can move backward + smarter tracking)
   defenders.forEach(d => {
-    if (d.x > player.x) d.x -= 1.5;
-    if (d.y < player.y) d.y += 1.5;
-    if (d.y > player.y) d.y -= 1.5;
+    let dx = player.x - d.x;
+    let dy = player.y - d.y;
+
+    d.x += dx * 0.02; // allows backward + forward movement
+    d.y += dy * 0.05;
 
     // tackle
     if (Math.abs(d.x - player.x) < 10 && Math.abs(d.y - player.y) < 10) {
-      resetPlay();
+      nextDown();
     }
   });
 
-  // touchdown
-  if (player.x > 750) {
+  // Touchdown
+  if (player.x >= 880) {
     score += 7;
-    resetPlay();
+    initDrive();
   }
 
   time -= 1/60;
   if (time <= 0) {
-    alert("Game Over! Score: " + score);
+    alert("Final Score: " + score);
     location.reload();
   }
 }
 
-function resetPlay() {
-  player.x = 100;
+function nextDown() {
+  let gained = player.x - lineOfScrimmage;
+
+  if (player.x >= firstDownLine) {
+    // FIRST DOWN
+    lineOfScrimmage = player.x;
+    firstDownLine = lineOfScrimmage + 100;
+    down = 1;
+  } else {
+    down++;
+    if (down > 4) {
+      // turnover
+      initDrive();
+      return;
+    }
+  }
+
+  player.x = lineOfScrimmage;
   player.y = 200;
   ball.thrown = false;
 }
 
-function draw() {
-  ctx.clearRect(0,0,800,400);
-
-  // field
+function drawField() {
   ctx.fillStyle = "#0a3";
-  ctx.fillRect(0,0,800,400);
+  ctx.fillRect(0,0,900,400);
 
-  // player
+  // Yard lines every 50px
+  ctx.strokeStyle = "white";
+  for (let i = 0; i < 900; i += 50) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, 400);
+    ctx.stroke();
+  }
+
+  // Line of scrimmage
+  ctx.strokeStyle = "blue";
+  ctx.beginPath();
+  ctx.moveTo(lineOfScrimmage, 0);
+  ctx.lineTo(lineOfScrimmage, 400);
+  ctx.stroke();
+
+  // First down line
+  ctx.strokeStyle = "yellow";
+  ctx.beginPath();
+  ctx.moveTo(firstDownLine, 0);
+  ctx.lineTo(firstDownLine, 400);
+  ctx.stroke();
+}
+
+function draw() {
+  ctx.clearRect(0,0,900,400);
+
+  drawField();
+
+  // Player
   ctx.fillStyle = playerTeam.color;
-  ctx.fillRect(player.x, player.y, 10, 10);
+  ctx.fillRect(player.x, player.y, 12, 12);
 
-  // ball
+  // Ball
   ctx.fillStyle = "brown";
-  ctx.fillRect(ball.x, ball.y, 5, 5);
+  ctx.fillRect(ball.x, ball.y, 6, 6);
 
-  // defenders
+  // Defenders
   ctx.fillStyle = "white";
-  defenders.forEach(d => ctx.fillRect(d.x, d.y, 10, 10));
+  defenders.forEach(d => ctx.fillRect(d.x, d.y, 12, 12));
 
   // UI
   ctx.fillStyle = "white";
   ctx.fillText("Score: " + score, 10, 20);
   ctx.fillText("Time: " + Math.floor(time), 10, 40);
+  ctx.fillText("Down: " + down, 10, 60);
+  ctx.fillText("To Go: " + Math.max(0, firstDownLine - player.x), 10, 80);
 }
 
 function gameLoop() {
