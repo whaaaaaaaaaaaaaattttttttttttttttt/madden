@@ -1,29 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gridiron Legends</title>
-  <link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gridiron Legends</title>
+<link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<div id="menu" class="screen">
+<!-- MENU -->
+<div id="menu" class="screen active">
   <h1>🏈 GRIDIRON LEGENDS</h1>
-  <button onclick="show('gameScreen')">Play</button>
-  <button onclick="show('rosterScreen')">Roster</button>
-  <button onclick="show('tradeScreen')">Trade</button>
-  <button onclick="show('faScreen')">Free Agency</button>
+  <button onclick="go('game')">Play</button>
+  <button onclick="go('roster')">Roster</button>
+  <button onclick="go('trade')">Trade</button>
+  <button onclick="go('fa')">Free Agency</button>
   <button onclick="toggleSandbox()">Sandbox</button>
 </div>
 
-<div id="gameScreen" class="screen hidden">
-  <canvas id="game"></canvas>
-  <button onclick="show('menu')">Exit</button>
+<!-- GAME -->
+<div id="game" class="screen">
+  <canvas id="c"></canvas>
+  <button class="back" onclick="go('menu')">Back</button>
 </div>
 
-<div id="rosterScreen" class="screen hidden"></div>
-<div id="tradeScreen" class="screen hidden"></div>
-<div id="faScreen" class="screen hidden"></div>
+<!-- ROSTER -->
+<div id="roster" class="screen">
+  <div id="rosterList" class="panel"></div>
+  <button class="back" onclick="go('menu')">Back</button>
+</div>
 
+<!-- TRADE -->
+<div id="trade" class="screen">
+  <div id="tradeList" class="panel"></div>
+  <button class="back" onclick="go('menu')">Back</button>
+</div>
+
+<!-- FREE AGENCY -->
+<div id="fa" class="screen">
+  <div id="faList" class="panel"></div>
+  <button class="back" onclick="go('menu')">Back</button>
+</div>
+
+<script src="systems.js"></script>
 <script src="game.js"></script>
+
 </body>
 </html>
