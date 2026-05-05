@@ -1,230 +1,287 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Retro Gridiron</title>
+  <title>Gridiron Engine</title>
   <style>
     body {
       margin:0;
       font-family:Arial;
+      background:#0b5;
       color:white;
-      overflow:hidden;
     }
 
-    /* Stadium Background */
-    .bg {
-      position:fixed;
-      width:100%;
-      height:100%;
-      background: linear-gradient(#0a5, #063);
-    }
-
-    /* Center Screen */
-    .screen {
-      position:absolute;
-      width:100%;
-      height:100%;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      flex-direction:column;
-    }
-
-    h1 {
-      font-size:48px;
-      margin-bottom:40px;
-      text-shadow:0 0 20px black;
-    }
-
-    .big-btn {
-      width:260px;
+    .page {
+      display:none;
       padding:20px;
-      margin:15px;
-      font-size:20px;
-      border:none;
-      cursor:pointer;
-      background:#0c8;
-      color:white;
-      border-radius:10px;
-      transition:0.2s;
     }
 
-    .big-btn:hover {
-      background:#0ea;
-      transform:scale(1.05);
+    .active {
+      display:block;
     }
 
-    .panel {
-      background:rgba(0,0,0,0.6);
-      padding:20px;
-      border-radius:10px;
+    .menu {
+      text-align:center;
+      margin-top:100px;
     }
 
     .btn {
-      padding:10px;
-      margin:5px;
+      padding:14px 20px;
+      margin:10px;
       background:#0c8;
       border:none;
       color:white;
       cursor:pointer;
+      border-radius:10px;
+      font-size:16px;
     }
 
+    .card {
+      background:#064;
+      padding:10px;
+      margin:8px 0;
+      border-radius:10px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    .avatar {
+      width:40px;
+      height:40px;
+      border-radius:50%;
+      background:#fff;
+      color:#000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:bold;
+    }
+
+    canvas {
+      background:#083;
+      display:block;
+      margin:auto;
+    }
   </style>
 </head>
 <body>
 
-<div class="bg"></div>
-
-<!-- MAIN MENU -->
-<div id="menu" class="screen">
-  <h1>🏈 Retro Gridiron</h1>
-  <button class="big-btn" onclick="goFranchise()">Franchise Mode</button>
-  <button class="big-btn" onclick="startQuick()">Quick Play</button>
+<!-- MENU -->
+<div id="menu" class="page active menu">
+  <h1>🏈 Grid Engine</h1>
+  <button class="btn" onclick="go('play')">Play</button>
+  <button class="btn" onclick="go('roster')">Roster</button>
+  <button class="btn" onclick="go('trade')">Trade</button>
+  <button class="btn" onclick="go('fa')">Free Agency</button>
 </div>
 
-<!-- FRANCHISE HUB -->
-<div id="hub" class="screen" style="display:none;">
-  <div class="panel">
-    <h2>Metro Hawks</h2>
-    <p id="record"></p>
+<!-- PLAY -->
+<div id="play" class="page">
+  <button class="btn" onclick="go('menu')">Back</button>
+  <canvas id="game" width="700" height="350"></canvas>
+</div>
 
-    <button class="btn" onclick="playGame()">Play Game</button>
-    <button class="btn" onclick="viewRoster()">Roster</button>
-    <button class="btn" onclick="freeAgency()">Free Agency</button>
-    <button class="btn" onclick="toggleSandbox()">Toggle Sandbox</button>
-    <button class="btn" onclick="backMenu()">Back</button>
-  </div>
+<!-- ROSTER -->
+<div id="roster" class="page">
+  <button class="btn" onclick="go('menu')">Back</button>
+  <h2>Roster</h2>
+  <div id="rosterList"></div>
+</div>
+
+<!-- TRADE -->
+<div id="trade" class="page">
+  <button class="btn" onclick="go('menu')">Back</button>
+  <h2>Trade Center</h2>
+  <div id="tradeList"></div>
+</div>
+
+<!-- FREE AGENCY -->
+<div id="fa" class="page">
+  <button class="btn" onclick="go('menu')">Back</button>
+  <h2>Free Agency</h2>
+  <div id="faList"></div>
 </div>
 
 <script>
-// ================= DATA =================
-function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
 
-function genPlayer(){
-  let names=["Jay","Mike","Chris","Ty","AJ","Cam"];
-  let lasts=["Smith","Brown","Davis","Wilson"];
-  let ovr=rand(60,90);
+// ================= NAV =================
+function go(page){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(page).classList.add("active");
+
+  if(page==="roster") renderRoster();
+  if(page==="trade") renderTrade();
+  if(page==="fa") renderFA();
+}
+
+// ================= PLAYER SYSTEM =================
+function player(name){
+  let ovr = rand(60,95);
   return {
-    name:names[rand(0,5)]+" "+lasts[rand(0,3)],
-    ovr:ovr,
-    salary:ovr*10
+    name,
+    ovr,
+    img: initials(name),
+    salary: ovr*10
   };
 }
 
-let team={
-  roster:[genPlayer(),genPlayer(),genPlayer()],
+function initials(n){
+  return n.split(" ").map(x=>x[0]).join("");
+}
+
+function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+// ================= TEAM =================
+let team = {
+  roster:[
+    player("Jay Smith"),
+    player("Mike Brown"),
+    player("Chris Davis")
+  ],
   cap:1000
 };
 
-let freeAgents = Array.from({length:6},()=>genPlayer());
-
-let wins=0, losses=0, week=1;
-let sandbox=false;
-
-// ================= NAV =================
-function show(id){
-  document.getElementById("menu").style.display="none";
-  document.getElementById("hub").style.display="none";
-
-  document.getElementById(id).style.display="flex";
-}
-
-function backMenu(){
-  show("menu");
-}
-
-// ================= MENU =================
-function goFranchise(){
-  show("hub");
-  updateHub();
-}
-
-function startQuick(){
-  let win = Math.random() > 0.5;
-  alert(win ? "Quick Win!" : "Quick Loss!");
-}
-
-// ================= HUB =================
-function updateHub(){
-  document.getElementById("record").innerText =
-    `Record: ${wins}-${losses} | Week ${week} | Cap: $${team.cap}`;
-}
-
-// ================= GAME =================
-function playGame(){
-  let teamOVR = avg(team.roster);
-  let result = teamOVR + rand(-10,10) > 75;
-
-  if(result){
-    wins++;
-    alert("You Won!");
-  } else {
-    losses++;
-    alert("You Lost!");
-  }
-
-  week++;
-
-  if(week>10){
-    playoffs();
-  }
-
-  updateHub();
-}
-
-function avg(r){
-  return r.reduce((a,b)=>a+b.ovr,0)/r.length;
-}
-
-function playoffs(){
-  if(wins<6){
-    alert("Missed Playoffs");
-  } else {
-    alert("🏆 Championship!");
-  }
-
-  wins=0;
-  losses=0;
-  week=1;
-}
+let freeAgents = [
+  player("Ty Wilson"),
+  player("Cam Johnson"),
+  player("Zay Miller")
+];
 
 // ================= ROSTER =================
-function viewRoster(){
-  let text="Roster:\n";
-  team.roster.forEach(p=>{
-    text+=`${p.name} | OVR ${p.ovr}\n`;
+function renderRoster(){
+  let div=document.getElementById("rosterList");
+  div.innerHTML="";
+
+  team.roster.forEach((p,i)=>{
+    div.innerHTML += `
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="avatar">${p.img}</div>
+          ${p.name} | OVR ${p.ovr}
+        </div>
+        <button class="btn" onclick="cut(${i})">Cut</button>
+      </div>`;
   });
-  alert(text);
 }
 
-// ================= FA =================
-function freeAgency(){
-  let text="Free Agents:\n";
+function cut(i){
+  team.roster.splice(i,1);
+  renderRoster();
+}
+
+// ================= FREE AGENCY =================
+function renderFA(){
+  let div=document.getElementById("faList");
+  div.innerHTML="";
+
   freeAgents.forEach((p,i)=>{
-    text+=`${i+1}. ${p.name} OVR ${p.ovr} $${p.salary}\n`;
+    div.innerHTML += `
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="avatar">${p.img}</div>
+          ${p.name} | OVR ${p.ovr}
+        </div>
+        <button class="btn" onclick="sign(${i})">Sign</button>
+      </div>`;
   });
+}
 
-  let pick=prompt(text+"\nPick number:");
-  let p=freeAgents[pick-1];
-  if(!p) return;
-
-  if(!sandbox && team.cap < p.salary){
-    alert("No cap!");
+function sign(i){
+  let p=freeAgents[i];
+  if(team.cap < p.salary){
+    alert("No cap space!");
     return;
   }
 
   team.cap -= p.salary;
   team.roster.push(p);
-  freeAgents.splice(pick-1,1);
+  freeAgents.splice(i,1);
 
-  alert("Signed "+p.name);
-  updateHub();
+  renderFA();
 }
 
-// ================= SETTINGS =================
-function toggleSandbox(){
-  sandbox=!sandbox;
-  alert("Sandbox: "+(sandbox?"ON":"OFF"));
+// ================= TRADE =================
+function renderTrade(){
+  let div=document.getElementById("tradeList");
+  div.innerHTML="";
+
+  let other = player("CPU Star QB");
+
+  div.innerHTML = `
+    <div class="card">
+      ${other.name} OVR ${other.ovr}
+      <button class="btn" onclick="trade()">Offer Trade</button>
+    </div>`;
 }
+
+function trade(){
+  let my = team.roster[0];
+  let cpu = player("CPU QB");
+
+  if(cpu.ovr > my.ovr){
+    alert("Trade rejected");
+  } else {
+    team.roster[0]=cpu;
+    alert("Trade accepted!");
+  }
+}
+
+// ================= 1v1 GAME ENGINE =================
+let canvas=document.getElementById("game");
+let ctx=canvas.getContext("2d");
+
+let qb, def, ball;
+
+function startGame(){
+  qb={x:100,y:175};
+  def={x:400,y:175};
+  ball={x:100,y:175,inAir:false,target:null};
+
+  loop();
+}
+
+function update(){
+  if(keys["w"]) qb.y-=3;
+  if(keys["s"]) qb.y+=3;
+  if(keys["d"]) qb.x+=3;
+
+  def.x += (qb.x - def.x)*0.04;
+  def.y += (qb.y - def.y)*0.04;
+
+  if(Math.abs(def.x-qb.x)<12){
+    alert("TACKLED");
+    startGame();
+  }
+
+  if(qb.x>650){
+    alert("TOUCHDOWN");
+    startGame();
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,700,350);
+
+  ctx.fillStyle="yellow";
+  ctx.fillRect(qb.x,qb.y,14,14);
+
+  ctx.fillStyle="white";
+  ctx.fillRect(def.x,def.y,14,14);
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// controls
+let keys={};
+document.addEventListener("keydown",e=>keys[e.key]=true);
+
+// auto start game when play tab opens
+document.getElementById("play").addEventListener("click",startGame);
+
 </script>
 
 </body>
