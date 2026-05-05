@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Retro Gridiron</title>
+  <title>Retro Gridiron Final</title>
   <style>
     body { margin:0; font-family:Arial; background:#0b5; color:white; text-align:center;}
     canvas { display:block; margin:auto; border:4px solid white; background:#083;}
@@ -13,83 +13,75 @@
 <div id="menu">
   <h1>🏈 Retro Gridiron</h1>
   <button onclick="startQuick()">Quick Play</button>
-  <button onclick="startFranchise()">Franchise Mode</button>
+  <button onclick="startFranchise()">Franchise</button>
 </div>
 
 <div id="hub" style="display:none;">
-  <h2 id="teamName"></h2>
+  <h2>Metro Hawks</h2>
   <p id="record"></p>
   <button onclick="playGame()">Play Game</button>
   <button onclick="upgrade()">Upgrade</button>
-  <button onclick="viewRoster()">View Roster</button>
-  <button onclick="backToMenu()">Back</button>
+  <button onclick="viewRoster()">Roster</button>
 </div>
 
 <div id="roster" style="display:none;">
   <h2>Roster</h2>
-  <p id="rosterText"></p>
-  <button onclick="backToHub()">Back</button>
+  <pre id="rosterText"></pre>
+  <button onclick="backHub()">Back</button>
 </div>
 
 <canvas id="game" width="700" height="350" style="display:none;"></canvas>
 
 <script>
-let canvas = document.getElementById("game");
-let ctx = canvas.getContext("2d");
+let canvas=document.getElementById("game");
+let ctx=canvas.getContext("2d");
 
-let mode = "quick";
-
-let state = {
-  wins:0,
-  losses:0,
-  week:1,
-  player:{ speed:2.5, catch:0.8 }
+let state={
+  wins:0,losses:0,week:1,
+  qb:{speed:2.5,throw:0.8},
+  wr:{speed:2.5,catch:0.8}
 };
 
-let qb, defenders;
-let inGame=false;
+function save(){ localStorage.setItem("retro",JSON.stringify(state)); }
+function load(){ let s=localStorage.getItem("retro"); if(s) state=JSON.parse(s); }
 
-function startQuick(){
-  mode="quick";
-  playGame();
-}
+let qb,wr,wr2,defenders,ball,aiming=false;
 
+function startQuick(){ playGame(); }
 function startFranchise(){
-  mode="franchise";
+  load();
   document.getElementById("menu").style.display="none";
   document.getElementById("hub").style.display="block";
   updateHub();
 }
 
 function updateHub(){
-  document.getElementById("teamName").innerText = "Metro Hawks";
   document.getElementById("record").innerText =
     `Record: ${state.wins}-${state.losses} | Week ${state.week}`;
-}
-
-function backToMenu(){
-  document.getElementById("hub").style.display="none";
-  document.getElementById("menu").style.display="block";
 }
 
 function viewRoster(){
   document.getElementById("hub").style.display="none";
   document.getElementById("roster").style.display="block";
-
   document.getElementById("rosterText").innerText =
-    `QB Speed: ${state.player.speed.toFixed(1)}
-Catch: ${state.player.catch.toFixed(2)}`;
+`QB Speed: ${state.qb.speed.toFixed(1)}
+QB Throw: ${state.qb.throw.toFixed(2)}
+WR Speed: ${state.wr.speed.toFixed(1)}
+WR Catch: ${state.wr.catch.toFixed(2)}`;
 }
 
-function backToHub(){
+function backHub(){
   document.getElementById("roster").style.display="none";
   document.getElementById("hub").style.display="block";
 }
 
 function upgrade(){
-  state.player.speed += 0.2;
-  state.player.catch += 0.05;
-  alert("Upgraded!");
+  state.qb.speed+=0.2;
+  state.qb.throw+=0.05;
+  state.wr.speed+=0.2;
+  state.wr.catch+=0.05;
+  save();
+  alert("Team upgraded!");
   updateHub();
 }
 
@@ -99,94 +91,121 @@ function playGame(){
   document.getElementById("roster").style.display="none";
   canvas.style.display="block";
 
-  qb = {x:80,y:175};
-  defenders = [];
+  qb={x:80,y:175};
+  wr={x:80,y:120};
+  wr2={x:80,y:260};
+
+  defenders=[];
   for(let i=0;i<4;i++){
     defenders.push({x:350+i*40,y:Math.random()*350});
   }
 
-  inGame=true;
+  ball={x:qb.x,y:qb.y,vx:0,vy:0,inAir:false};
+
   gameLoop();
 }
 
 let keys={};
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
+document.addEventListener("keydown",e=>{
+  keys[e.key]=true;
+  if(e.key===" ") aiming=true;
+});
+document.addEventListener("keyup",e=>{
+  keys[e.key]=false;
+  if(e.key===" " && aiming){
+    throwBall();
+    aiming=false;
+  }
+});
+
+function throwBall(){
+  let dx=wr.x-qb.x;
+  let dy=wr.y-qb.y;
+  ball.vx=dx*0.1*state.qb.throw;
+  ball.vy=dy*0.1*state.qb.throw;
+  ball.inAir=true;
+}
 
 function update(){
-  let speed = keys["Shift"] ? state.player.speed+1 : state.player.speed;
+  if(keys["w"]) qb.y-=state.qb.speed;
+  if(keys["s"]) qb.y+=state.qb.speed;
 
-  if(keys["w"]) qb.y -= speed;
-  if(keys["s"]) qb.y += speed;
-  if(keys["d"]) qb.x += speed;
+  wr.x+=state.wr.speed;
+  wr2.x+=state.wr.speed;
 
-  // smarter AI (predict movement)
   defenders.forEach(d=>{
-    let targetX = qb.x + 30; // predict forward
-    let targetY = qb.y;
+    let tx = ball.inAir ? ball.x : qb.x+40;
+    let ty = ball.inAir ? ball.y : qb.y;
 
-    d.x += (targetX - d.x)*0.05;
-    d.y += (targetY - d.y)*0.05;
+    d.x+=(tx-d.x)*0.06;
+    d.y+=(ty-d.y)*0.06;
 
     if(Math.abs(d.x-qb.x)<12 && Math.abs(d.y-qb.y)<12){
-      endGame(false);
+      end(false);
     }
   });
 
-  if(qb.x > 650){
-    endGame(true);
+  if(ball.inAir){
+    ball.x+=ball.vx;
+    ball.y+=ball.vy;
+
+    if(Math.abs(ball.x-wr.x)<10 && Math.abs(ball.y-wr.y)<10){
+      if(Math.random()<state.wr.catch){
+        qb.x=wr.x;
+        qb.y=wr.y;
+        ball.inAir=false;
+      } else end(false);
+    }
   }
+
+  if(qb.x>650) end(true);
 }
 
-function endGame(win){
-  inGame=false;
+function end(win){
+  if(win) state.wins++;
+  else state.losses++;
+  state.week++;
+  save();
 
-  if(mode==="franchise"){
-    if(win) state.wins++;
-    else state.losses++;
-    state.week++;
-  }
-
-  alert(win ? "Touchdown! You win!" : "Tackled! You lose!");
+  alert(win?"TOUCHDOWN!":"STOPPED!");
 
   canvas.style.display="none";
-
-  if(mode==="franchise"){
-    document.getElementById("hub").style.display="block";
-    updateHub();
-  } else {
-    document.getElementById("menu").style.display="block";
-  }
+  document.getElementById("hub").style.display="block";
+  updateHub();
 }
 
 function draw(){
   ctx.fillStyle="#083";
   ctx.fillRect(0,0,700,350);
 
-  // yard lines
   ctx.strokeStyle="white";
   for(let i=0;i<700;i+=50){
-    ctx.beginPath();
-    ctx.moveTo(i,0);
-    ctx.lineTo(i,350);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,350); ctx.stroke();
   }
 
-  // QB
   ctx.fillStyle="yellow";
   ctx.fillRect(qb.x,qb.y,14,14);
 
-  // defenders
+  ctx.fillStyle="lime";
+  ctx.fillRect(wr.x,wr.y,12,12);
+  ctx.fillRect(wr2.x,wr2.y,12,12);
+
   ctx.fillStyle="white";
   defenders.forEach(d=>ctx.fillRect(d.x,d.y,12,12));
+
+  if(aiming){
+    ctx.strokeStyle="red";
+    ctx.beginPath();
+    ctx.moveTo(qb.x,qb.y);
+    ctx.lineTo(wr.x,wr.y);
+    ctx.stroke();
+  }
 }
 
 function gameLoop(){
-  if(inGame){
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
-  }
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
 }
 </script>
 
