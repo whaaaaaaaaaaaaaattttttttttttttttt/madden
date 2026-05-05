@@ -1,227 +1,246 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Retro Gridiron Final</title>
+  <title>Retro Gridiron Franchise</title>
   <style>
-    body { margin:0; font-family:Arial; background:#0b5; color:white; text-align:center;}
-    canvas { display:block; margin:auto; border:4px solid white; background:#083;}
-    button { padding:10px 20px; margin:8px; font-size:16px;}
+    body {
+      margin:0;
+      font-family:Arial;
+      background:#0b5;
+      color:white;
+    }
+
+    header {
+      background:#063;
+      padding:15px;
+      text-align:center;
+      font-size:22px;
+      font-weight:bold;
+    }
+
+    .container {
+      display:flex;
+      height:calc(100vh - 60px);
+    }
+
+    .sidebar {
+      width:220px;
+      background:#074;
+      padding:15px;
+    }
+
+    .sidebar button {
+      width:100%;
+      margin:6px 0;
+      padding:10px;
+      border:none;
+      background:#0a6;
+      color:white;
+      cursor:pointer;
+      font-size:14px;
+    }
+
+    .sidebar button:hover {
+      background:#0c8;
+    }
+
+    .content {
+      flex:1;
+      padding:20px;
+      overflow:auto;
+    }
+
+    .card {
+      background:#086;
+      padding:10px;
+      margin:8px 0;
+      border-radius:6px;
+      display:flex;
+      justify-content:space-between;
+    }
+
+    .topbar {
+      margin-bottom:15px;
+      font-size:16px;
+    }
+
+    .btn {
+      background:#0c8;
+      border:none;
+      padding:8px 12px;
+      cursor:pointer;
+      color:white;
+      margin:5px;
+    }
   </style>
 </head>
 <body>
 
-<div id="menu">
-  <h1>🏈 Retro Gridiron</h1>
-  <button onclick="startQuick()">Quick Play</button>
-  <button onclick="startFranchise()">Franchise</button>
-</div>
+<header>🏈 Retro Gridiron Franchise</header>
 
-<div id="hub" style="display:none;">
-  <h2>Metro Hawks</h2>
-  <p id="record"></p>
-  <button onclick="playGame()">Play Game</button>
-  <button onclick="upgrade()">Upgrade</button>
-  <button onclick="viewRoster()">Roster</button>
-</div>
+<div class="container">
 
-<div id="roster" style="display:none;">
-  <h2>Roster</h2>
-  <pre id="rosterText"></pre>
-  <button onclick="backHub()">Back</button>
-</div>
+  <div class="sidebar">
+    <button onclick="showTab('hub')">Hub</button>
+    <button onclick="showTab('roster')">Roster</button>
+    <button onclick="showTab('fa')">Free Agency</button>
+    <button onclick="showTab('settings')">Settings</button>
+  </div>
 
-<canvas id="game" width="700" height="350" style="display:none;"></canvas>
+  <div class="content">
+
+    <div id="hubTab">
+      <div class="topbar" id="record"></div>
+      <button class="btn" onclick="playGame()">Play Game</button>
+    </div>
+
+    <div id="rosterTab" style="display:none;"></div>
+
+    <div id="faTab" style="display:none;"></div>
+
+    <div id="settingsTab" style="display:none;">
+      <button class="btn" onclick="toggleSandbox()">Toggle Sandbox</button>
+    </div>
+
+  </div>
+
+</div>
 
 <script>
-<script>
-// ======================
-// CORE DATA
-// ======================
-const FIRST_NAMES = ["Jay","Mike","Chris","Ty","AJ","Dee","Cam","Zay","Noah","Eli"];
-const LAST_NAMES = ["Smith","Johnson","Brown","Davis","Miller","Wilson","Moore","Taylor"];
-
+// ================= DATA =================
 function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
 
 function genPlayer(){
+  let names=["Jay","Mike","Chris","Ty","AJ","Cam","Zay"];
+  let lasts=["Smith","Brown","Davis","Wilson"];
+  let ovr = rand(60,90);
   return {
-    name: FIRST_NAMES[rand(0,9)]+" "+LAST_NAMES[rand(0,7)],
-    ovr: rand(60,90),
-    salary: 0
+    name:names[rand(0,6)]+" "+lasts[rand(0,3)],
+    ovr:ovr,
+    salary:ovr*10
   };
 }
 
-// generate 32 teams
-let league = [];
-for(let i=0;i<32;i++){
-  let team = {
-    name:"Team "+(i+1),
-    ovr:rand(65,90),
-    roster:[genPlayer(),genPlayer(),genPlayer()]
-  };
-  team.roster.forEach(p=>p.salary = p.ovr * 10);
-  league.push(team);
-}
-
-// YOUR TEAM
-let myTeam = {
-  name:"Metro Hawks",
+let myTeam={
   roster:[genPlayer(),genPlayer(),genPlayer()],
   cap:1000
 };
-myTeam.roster.forEach(p=>p.salary = p.ovr*10);
 
-let freeAgents = [];
-for(let i=0;i<10;i++){
-  let p = genPlayer();
-  p.salary = p.ovr * 10;
-  freeAgents.push(p);
+let freeAgents = Array.from({length:8},()=>genPlayer());
+
+let sandbox=false;
+let wins=0, losses=0, week=1;
+
+// ================= NAV =================
+function showTab(tab){
+  ["hub","roster","fa","settings"].forEach(t=>{
+    document.getElementById(t+"Tab").style.display="none";
+  });
+
+  document.getElementById(tab+"Tab").style.display="block";
+
+  if(tab==="roster") renderRoster();
+  if(tab==="fa") renderFA();
 }
 
-let sandbox = false;
-
-// ======================
-// UI NAV
-// ======================
-function openSettings(){
-  let toggle = confirm("Enable Sandbox Mode? (No salary cap)");
-  sandbox = toggle;
+// ================= HUB =================
+function updateHub(){
+  document.getElementById("record").innerText =
+    `Record: ${wins}-${losses} | Week ${week} | Cap: $${myTeam.cap}`;
 }
 
-function viewRoster(){
-  let text="YOUR TEAM:\n";
+// ================= ROSTER =================
+function renderRoster(){
+  let div=document.getElementById("rosterTab");
+  div.innerHTML="<h2>Your Team</h2>";
+
   myTeam.roster.forEach((p,i)=>{
-    text+=`${i+1}. ${p.name} - OVR ${p.ovr} ($${p.salary})\n`;
+    div.innerHTML += `
+      <div class="card">
+        ${p.name} | OVR ${p.ovr}
+        <button class="btn" onclick="cutPlayer(${i})">Cut</button>
+      </div>`;
   });
-
-  alert(text);
 }
 
-// ======================
-// FREE AGENCY
-// ======================
-function freeAgency(){
-  let text="FREE AGENTS:\n";
+function cutPlayer(i){
+  let p = myTeam.roster[i];
+  myTeam.cap += p.salary;
+  myTeam.roster.splice(i,1);
+  renderRoster();
+}
+
+// ================= FREE AGENCY =================
+function renderFA(){
+  let div=document.getElementById("faTab");
+  div.innerHTML="<h2>Free Agents</h2>";
+
   freeAgents.forEach((p,i)=>{
-    text+=`${i+1}. ${p.name} OVR ${p.ovr} ($${p.salary})\n`;
+    div.innerHTML += `
+      <div class="card">
+        ${p.name} | OVR ${p.ovr} | $${p.salary}
+        <button class="btn" onclick="signPlayer(${i})">Sign</button>
+      </div>`;
   });
+}
 
-  let pick = prompt(text+"\nEnter number to sign:");
-  let player = freeAgents[pick-1];
-  if(!player) return;
+function signPlayer(i){
+  let p = freeAgents[i];
 
-  if(!sandbox && myTeam.cap < player.salary){
+  if(!sandbox && myTeam.cap < p.salary){
     alert("Not enough cap!");
     return;
   }
 
-  myTeam.cap -= player.salary;
-  myTeam.roster.push(player);
-  freeAgents.splice(pick-1,1);
+  myTeam.cap -= p.salary;
+  myTeam.roster.push(p);
+  freeAgents.splice(i,1);
 
-  alert("Signed "+player.name);
+  renderFA();
+  updateHub();
 }
 
-// ======================
-// TRADES
-// ======================
-function trade(){
-  let other = league[rand(0,31)];
-  let theirPlayer = other.roster[0];
-  let myPlayer = myTeam.roster[0];
-
-  if(!theirPlayer || !myPlayer) return;
-
-  if(theirPlayer.ovr > myPlayer.ovr + 10){
-    alert("Trade declined!");
-    return;
-  }
-
-  other.roster[0] = myPlayer;
-  myTeam.roster[0] = theirPlayer;
-
-  alert("Trade completed!");
+// ================= SETTINGS =================
+function toggleSandbox(){
+  sandbox = !sandbox;
+  alert("Sandbox: "+(sandbox?"ON":"OFF"));
 }
 
-// ======================
-// SEASON + PLAYOFFS
-// ======================
-let wins=0, losses=0, week=1;
+// ================= GAME =================
+function avgOVR(){
+  return myTeam.roster.reduce((a,b)=>a+b.ovr,0)/myTeam.roster.length;
+}
 
 function playGame(){
-  let myOVR = avgOVR(myTeam.roster);
-  let opp = league[rand(0,31)];
-  let oppOVR = avgOVR(opp.roster);
+  let win = avgOVR() + rand(-10,10) > 75;
 
-  let result = myOVR + rand(-10,10) > oppOVR;
-
-  if(result){ wins++; alert("You beat "+opp.name); }
-  else { losses++; alert("Lost to "+opp.name); }
+  if(win){ wins++; alert("Win!"); }
+  else { losses++; alert("Loss!"); }
 
   week++;
 
   if(week>10){
     playoffs();
   }
-}
 
-function avgOVR(r){
-  return r.reduce((a,b)=>a+b.ovr,0)/r.length;
+  updateHub();
 }
 
 function playoffs(){
-  if(wins < 6){
-    alert("Missed playoffs!");
-    resetSeason();
-    return;
+  if(wins<6){
+    alert("Missed Playoffs");
+  } else {
+    alert("🏆 Championship Run!");
   }
 
-  let rounds = ["Wild Card","Divisional","Championship","Super Bowl"];
-
-  for(let r of rounds){
-    let win = Math.random() > 0.4;
-    if(!win){
-      alert("Eliminated in "+r);
-      resetSeason();
-      return;
-    }
-  }
-
-  alert("🏆 YOU WON THE CHAMPIONSHIP!");
-  resetSeason();
-}
-
-function resetSeason(){
   wins=0;
   losses=0;
   week=1;
 }
 
-// ======================
-// SIMPLE HUB
-// ======================
-function hub(){
-  let choice = prompt(
-`W:${wins} L:${losses} Week:${week}
-Cap:$${myTeam.cap}
-
-1.Play Game
-2.Roster
-3.Free Agency
-4.Trade
-5.Settings`
-  );
-
-  if(choice=="1") playGame();
-  if(choice=="2") viewRoster();
-  if(choice=="3") freeAgency();
-  if(choice=="4") trade();
-  if(choice=="5") openSettings();
-
-  setTimeout(hub,100);
-}
-
-hub();
-</script>
+// INIT
+updateHub();
+renderRoster();
 </script>
 
 </body>
