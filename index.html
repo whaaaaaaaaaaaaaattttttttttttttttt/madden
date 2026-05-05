@@ -1,226 +1,261 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gridiron Legends v2</title>
+  <title>Gridiron Legends v5</title>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial;
-      background: #0b5;
-      color: white;
-      text-align: center;
-    }
-    canvas {
-      background: #0a3;
-      display: block;
-      margin: auto;
-      border: 4px solid white;
-    }
-    #menu {
-      margin-top: 40px;
-    }
-    button {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
+    body { margin:0; font-family:Arial; background:#0b5; color:white; text-align:center;}
+    canvas { background:#0a3; display:block; margin:auto; border:4px solid white;}
+    #menu, #playMenu { margin-top:20px;}
+    button { padding:10px 20px; margin:10px; font-size:16px;}
   </style>
 </head>
 <body>
 
 <div id="menu">
-  <h1>🏈 Gridiron Legends v2</h1>
-  <p>Select Your Team</p>
+  <h1>🏈 Gridiron Legends v5</h1>
   <div id="teams"></div>
+</div>
+
+<div id="playMenu" style="display:none;">
+  <h2>Select Play</h2>
+  <button onclick="selectPlay('pass')">Pass</button>
+  <button onclick="selectPlay('run')">Run</button>
 </div>
 
 <canvas id="game" width="900" height="400" style="display:none;"></canvas>
 
 <script>
 const TEAMS = [
-  { name: "Metro Hawks", color: "red" },
-  { name: "Iron Wolves", color: "blue" },
-  { name: "Desert Vipers", color: "orange" },
-  { name: "Glacier Titans", color: "cyan" }
+  { name:"Metro Hawks", color:"red", speed:2.5, catch:0.8 },
+  { name:"Iron Wolves", color:"blue", speed:2.8, catch:0.7 },
+  { name:"Desert Vipers", color:"orange", speed:3.0, catch:0.6 },
+  { name:"Glacier Titans", color:"cyan", speed:2.2, catch:0.9 }
 ];
 
-let playerTeam = null;
+let playerTeam;
+let canvas = document.getElementById("game");
+let ctx = canvas.getContext("2d");
 
-const teamDiv = document.getElementById("teams");
-TEAMS.forEach((team, i) => {
-  const btn = document.createElement("button");
-  btn.innerText = team.name;
-  btn.onclick = () => startGame(i);
-  teamDiv.appendChild(btn);
+let qb, receivers, defenders, ball;
+let camX = 0;
+
+let down=1, los=200, firstDown=400, score=0, time=180;
+let currentPlay, inPlay=false;
+
+// TEAM SELECT
+TEAMS.forEach((t,i)=>{
+  let b=document.createElement("button");
+  b.innerText=t.name;
+  b.onclick=()=>startGame(i);
+  document.getElementById("teams").appendChild(b);
 });
 
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+function startGame(i){
+  playerTeam=TEAMS[i];
+  document.getElementById("menu").style.display="none";
+  document.getElementById("playMenu").style.display="block";
+}
 
-let player, defenders, ball;
-let score, time;
-let down, yardsToGo, lineOfScrimmage, firstDownLine;
-
-function startGame(teamIndex) {
-  playerTeam = TEAMS[teamIndex];
-  document.getElementById("menu").style.display = "none";
-  canvas.style.display = "block";
-
-  initDrive();
-
-  score = 0;
-  time = 120;
-
+// PLAY SELECT
+function selectPlay(p){
+  currentPlay=p;
+  setupPlay();
+  document.getElementById("playMenu").style.display="none";
+  canvas.style.display="block";
+  inPlay=true;
   gameLoop();
 }
 
-function initDrive() {
-  player = { x: 100, y: 200, speed: 3 };
-  ball = { x: player.x, y: player.y, vx: 0, vy: 0, thrown: false };
+function setupPlay(){
+  qb={x:los,y:200};
 
-  defenders = [];
-  for (let i = 0; i < 6; i++) {
-    defenders.push({ x: 400 + i*50, y: Math.random()*400 });
-  }
+  receivers=[
+    {x:los,y:120,route:"go"},
+    {x:los,y:200,route:"slant"},
+    {x:los,y:280,route:"out"}
+  ];
 
-  down = 1;
-  yardsToGo = 100;
-  lineOfScrimmage = 100;
-  firstDownLine = lineOfScrimmage + 100;
+  defenders=receivers.map(r=>({
+    x:r.x+60,y:r.y,type:Math.random()<0.5?"man":"zone"
+  }));
+
+  ball={x:qb.x,y:qb.y,inAir:false,target:null};
 }
 
-const keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+// CONTROLS
+let keys={};
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
-function update() {
-  // Player movement
-  if (keys["w"]) player.y -= player.speed;
-  if (keys["s"]) player.y += player.speed;
-  if (keys["a"]) player.x -= player.speed;
-  if (keys["d"]) player.x += player.speed;
+function update(){
+  let speed = keys["Shift"] ? playerTeam.speed+1 : playerTeam.speed;
 
-  // Throw ball
-  if (keys[" "] && !ball.thrown) {
-    ball.vx = 7;
-    ball.vy = 0;
-    ball.thrown = true;
+  // RUN PLAY
+  if(currentPlay==="run"){
+    if(keys["d"]) qb.x+=speed;
+    if(keys["w"]) qb.y-=speed;
+    if(keys["s"]) qb.y+=speed;
   }
 
-  if (!ball.thrown) {
-    ball.x = player.x;
-    ball.y = player.y;
-  } else {
-    ball.x += ball.vx;
+  // PASS PLAY
+  if(currentPlay==="pass"){
+    if(keys["w"]) qb.y-=speed;
+    if(keys["s"]) qb.y+=speed;
+
+    if(!ball.inAir){
+      if(keys["1"]) throwBall(receivers[0]);
+      if(keys["2"]) throwBall(receivers[1]);
+      if(keys["3"]) throwBall(receivers[2]);
+    }
   }
 
-  // DEFENSE (can move backward + smarter tracking)
-  defenders.forEach(d => {
-    let dx = player.x - d.x;
-    let dy = player.y - d.y;
+  // ROUTES
+  receivers.forEach(r=>{
+    if(r.route==="go") r.x+=3;
+    if(r.route==="slant"){ r.x+=2; r.y+=(r.y<200?1:-1);}
+    if(r.route==="out"){ r.x+=2; if(r.x>qb.x+80) r.y+=(r.y<200?-2:2);}
+  });
 
-    d.x += dx * 0.02; // allows backward + forward movement
-    d.y += dy * 0.05;
+  // DEFENSE
+  defenders.forEach((d,i)=>{
+    if(d.type==="man"){
+      let t=receivers[i];
+      d.x+=(t.x-d.x)*0.06;
+      d.y+=(t.y-d.y)*0.06;
+    } else {
+      // zone: guard space
+      let zoneX = qb.x + 150;
+      d.x += (zoneX - d.x)*0.03;
+    }
 
     // tackle
-    if (Math.abs(d.x - player.x) < 10 && Math.abs(d.y - player.y) < 10) {
-      nextDown();
+    if(Math.abs(d.x-qb.x)<10 && Math.abs(d.y-qb.y)<10){
+      endPlay(qb.x);
     }
   });
 
-  // Touchdown
-  if (player.x >= 880) {
-    score += 7;
-    initDrive();
-  }
+  // BALL
+  if(ball.inAir){
+    ball.x+=(ball.target.x-ball.x)*0.2;
+    ball.y+=(ball.target.y-ball.y)*0.2;
 
-  time -= 1/60;
-  if (time <= 0) {
-    alert("Final Score: " + score);
-    location.reload();
-  }
-}
-
-function nextDown() {
-  let gained = player.x - lineOfScrimmage;
-
-  if (player.x >= firstDownLine) {
-    // FIRST DOWN
-    lineOfScrimmage = player.x;
-    firstDownLine = lineOfScrimmage + 100;
-    down = 1;
-  } else {
-    down++;
-    if (down > 4) {
-      // turnover
-      initDrive();
-      return;
+    if(Math.abs(ball.x-ball.target.x)<5){
+      if(Math.random()<playerTeam.catch){
+        qb.x=ball.target.x;
+        qb.y=ball.target.y;
+        ball.inAir=false;
+      } else {
+        endPlay(los);
+      }
     }
   }
 
-  player.x = lineOfScrimmage;
-  player.y = 200;
-  ball.thrown = false;
+  // CAMERA follows QB
+  camX = qb.x - 200;
+
+  // TD
+  if(qb.x > 2000){
+    score+=7;
+    resetDrive();
+  }
+
+  time-=1/60;
 }
 
-function drawField() {
-  ctx.fillStyle = "#0a3";
+function throwBall(target){
+  ball.inAir=true;
+  ball.target={
+    x:target.x+30, // lead pass
+    y:target.y
+  };
+}
+
+function endPlay(newSpot){
+  inPlay=false;
+
+  if(newSpot>=firstDown){
+    los=newSpot;
+    firstDown=los+200;
+    down=1;
+  } else {
+    down++;
+    if(down>4){ resetDrive(); return;}
+    los=newSpot;
+  }
+
+  document.getElementById("playMenu").style.display="block";
+  canvas.style.display="none";
+}
+
+function resetDrive(){
+  down=1;
+  los=200;
+  firstDown=400;
+  document.getElementById("playMenu").style.display="block";
+  canvas.style.display="none";
+}
+
+// DRAW
+function drawField(){
+  ctx.fillStyle="#0a3";
   ctx.fillRect(0,0,900,400);
 
-  // Yard lines every 50px
-  ctx.strokeStyle = "white";
-  for (let i = 0; i < 900; i += 50) {
+  ctx.strokeStyle="white";
+  for(let i=-camX%50;i<900;i+=50){
     ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, 400);
+    ctx.moveTo(i,0);
+    ctx.lineTo(i,400);
     ctx.stroke();
   }
 
-  // Line of scrimmage
-  ctx.strokeStyle = "blue";
+  // LOS
+  ctx.strokeStyle="blue";
   ctx.beginPath();
-  ctx.moveTo(lineOfScrimmage, 0);
-  ctx.lineTo(lineOfScrimmage, 400);
+  ctx.moveTo(los-camX,0);
+  ctx.lineTo(los-camX,400);
   ctx.stroke();
 
-  // First down line
-  ctx.strokeStyle = "yellow";
+  // First down
+  ctx.strokeStyle="yellow";
   ctx.beginPath();
-  ctx.moveTo(firstDownLine, 0);
-  ctx.lineTo(firstDownLine, 400);
+  ctx.moveTo(firstDown-camX,0);
+  ctx.lineTo(firstDown-camX,400);
   ctx.stroke();
 }
 
-function draw() {
-  ctx.clearRect(0,0,900,400);
-
+function draw(){
   drawField();
 
-  // Player
-  ctx.fillStyle = playerTeam.color;
-  ctx.fillRect(player.x, player.y, 12, 12);
+  // QB
+  ctx.fillStyle=playerTeam.color;
+  ctx.fillRect(qb.x-camX,qb.y,12,12);
 
-  // Ball
-  ctx.fillStyle = "brown";
-  ctx.fillRect(ball.x, ball.y, 6, 6);
+  // WRs
+  ctx.fillStyle="lime";
+  receivers.forEach(r=>ctx.fillRect(r.x-camX,r.y,10,10));
 
-  // Defenders
-  ctx.fillStyle = "white";
-  defenders.forEach(d => ctx.fillRect(d.x, d.y, 12, 12));
+  // DEF
+  ctx.fillStyle="white";
+  defenders.forEach(d=>ctx.fillRect(d.x-camX,d.y,10,10));
+
+  // BALL
+  ctx.fillStyle="brown";
+  ctx.fillRect(ball.x-camX,ball.y,6,6);
 
   // UI
-  ctx.fillStyle = "white";
-  ctx.fillText("Score: " + score, 10, 20);
-  ctx.fillText("Time: " + Math.floor(time), 10, 40);
-  ctx.fillText("Down: " + down, 10, 60);
-  ctx.fillText("To Go: " + Math.max(0, firstDownLine - player.x), 10, 80);
+  ctx.fillStyle="white";
+  ctx.fillText("Score:"+score,10,20);
+  ctx.fillText("Down:"+down,10,40);
+  ctx.fillText("To Go:"+(firstDown-los),10,60);
 }
 
-function gameLoop() {
-  update();
-  draw();
-  requestAnimationFrame(gameLoop);
+// LOOP
+function gameLoop(){
+  if(inPlay){
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
 }
 </script>
 
