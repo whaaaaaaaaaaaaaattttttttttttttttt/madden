@@ -33,180 +33,195 @@
 <canvas id="game" width="700" height="350" style="display:none;"></canvas>
 
 <script>
-let canvas=document.getElementById("game");
-let ctx=canvas.getContext("2d");
+<script>
+// ======================
+// CORE DATA
+// ======================
+const FIRST_NAMES = ["Jay","Mike","Chris","Ty","AJ","Dee","Cam","Zay","Noah","Eli"];
+const LAST_NAMES = ["Smith","Johnson","Brown","Davis","Miller","Wilson","Moore","Taylor"];
 
-let state={
-  wins:0,losses:0,week:1,
-  qb:{speed:2.5,throw:0.8},
-  wr:{speed:2.5,catch:0.8}
-};
+function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
 
-function save(){ localStorage.setItem("retro",JSON.stringify(state)); }
-function load(){ let s=localStorage.getItem("retro"); if(s) state=JSON.parse(s); }
-
-let qb,wr,wr2,defenders,ball,aiming=false;
-
-function startQuick(){ playGame(); }
-function startFranchise(){
-  load();
-  document.getElementById("menu").style.display="none";
-  document.getElementById("hub").style.display="block";
-  updateHub();
+function genPlayer(){
+  return {
+    name: FIRST_NAMES[rand(0,9)]+" "+LAST_NAMES[rand(0,7)],
+    ovr: rand(60,90),
+    salary: 0
+  };
 }
 
-function updateHub(){
-  document.getElementById("record").innerText =
-    `Record: ${state.wins}-${state.losses} | Week ${state.week}`;
+// generate 32 teams
+let league = [];
+for(let i=0;i<32;i++){
+  let team = {
+    name:"Team "+(i+1),
+    ovr:rand(65,90),
+    roster:[genPlayer(),genPlayer(),genPlayer()]
+  };
+  team.roster.forEach(p=>p.salary = p.ovr * 10);
+  league.push(team);
+}
+
+// YOUR TEAM
+let myTeam = {
+  name:"Metro Hawks",
+  roster:[genPlayer(),genPlayer(),genPlayer()],
+  cap:1000
+};
+myTeam.roster.forEach(p=>p.salary = p.ovr*10);
+
+let freeAgents = [];
+for(let i=0;i<10;i++){
+  let p = genPlayer();
+  p.salary = p.ovr * 10;
+  freeAgents.push(p);
+}
+
+let sandbox = false;
+
+// ======================
+// UI NAV
+// ======================
+function openSettings(){
+  let toggle = confirm("Enable Sandbox Mode? (No salary cap)");
+  sandbox = toggle;
 }
 
 function viewRoster(){
-  document.getElementById("hub").style.display="none";
-  document.getElementById("roster").style.display="block";
-  document.getElementById("rosterText").innerText =
-`QB Speed: ${state.qb.speed.toFixed(1)}
-QB Throw: ${state.qb.throw.toFixed(2)}
-WR Speed: ${state.wr.speed.toFixed(1)}
-WR Catch: ${state.wr.catch.toFixed(2)}`;
-}
-
-function backHub(){
-  document.getElementById("roster").style.display="none";
-  document.getElementById("hub").style.display="block";
-}
-
-function upgrade(){
-  state.qb.speed+=0.2;
-  state.qb.throw+=0.05;
-  state.wr.speed+=0.2;
-  state.wr.catch+=0.05;
-  save();
-  alert("Team upgraded!");
-  updateHub();
-}
-
-function playGame(){
-  document.getElementById("menu").style.display="none";
-  document.getElementById("hub").style.display="none";
-  document.getElementById("roster").style.display="none";
-  canvas.style.display="block";
-
-  qb={x:80,y:175};
-  wr={x:80,y:120};
-  wr2={x:80,y:260};
-
-  defenders=[];
-  for(let i=0;i<4;i++){
-    defenders.push({x:350+i*40,y:Math.random()*350});
-  }
-
-  ball={x:qb.x,y:qb.y,vx:0,vy:0,inAir:false};
-
-  gameLoop();
-}
-
-let keys={};
-document.addEventListener("keydown",e=>{
-  keys[e.key]=true;
-  if(e.key===" ") aiming=true;
-});
-document.addEventListener("keyup",e=>{
-  keys[e.key]=false;
-  if(e.key===" " && aiming){
-    throwBall();
-    aiming=false;
-  }
-});
-
-function throwBall(){
-  let dx=wr.x-qb.x;
-  let dy=wr.y-qb.y;
-  ball.vx=dx*0.1*state.qb.throw;
-  ball.vy=dy*0.1*state.qb.throw;
-  ball.inAir=true;
-}
-
-function update(){
-  if(keys["w"]) qb.y-=state.qb.speed;
-  if(keys["s"]) qb.y+=state.qb.speed;
-
-  wr.x+=state.wr.speed;
-  wr2.x+=state.wr.speed;
-
-  defenders.forEach(d=>{
-    let tx = ball.inAir ? ball.x : qb.x+40;
-    let ty = ball.inAir ? ball.y : qb.y;
-
-    d.x+=(tx-d.x)*0.06;
-    d.y+=(ty-d.y)*0.06;
-
-    if(Math.abs(d.x-qb.x)<12 && Math.abs(d.y-qb.y)<12){
-      end(false);
-    }
+  let text="YOUR TEAM:\n";
+  myTeam.roster.forEach((p,i)=>{
+    text+=`${i+1}. ${p.name} - OVR ${p.ovr} ($${p.salary})\n`;
   });
 
-  if(ball.inAir){
-    ball.x+=ball.vx;
-    ball.y+=ball.vy;
+  alert(text);
+}
 
-    if(Math.abs(ball.x-wr.x)<10 && Math.abs(ball.y-wr.y)<10){
-      if(Math.random()<state.wr.catch){
-        qb.x=wr.x;
-        qb.y=wr.y;
-        ball.inAir=false;
-      } else end(false);
+// ======================
+// FREE AGENCY
+// ======================
+function freeAgency(){
+  let text="FREE AGENTS:\n";
+  freeAgents.forEach((p,i)=>{
+    text+=`${i+1}. ${p.name} OVR ${p.ovr} ($${p.salary})\n`;
+  });
+
+  let pick = prompt(text+"\nEnter number to sign:");
+  let player = freeAgents[pick-1];
+  if(!player) return;
+
+  if(!sandbox && myTeam.cap < player.salary){
+    alert("Not enough cap!");
+    return;
+  }
+
+  myTeam.cap -= player.salary;
+  myTeam.roster.push(player);
+  freeAgents.splice(pick-1,1);
+
+  alert("Signed "+player.name);
+}
+
+// ======================
+// TRADES
+// ======================
+function trade(){
+  let other = league[rand(0,31)];
+  let theirPlayer = other.roster[0];
+  let myPlayer = myTeam.roster[0];
+
+  if(!theirPlayer || !myPlayer) return;
+
+  if(theirPlayer.ovr > myPlayer.ovr + 10){
+    alert("Trade declined!");
+    return;
+  }
+
+  other.roster[0] = myPlayer;
+  myTeam.roster[0] = theirPlayer;
+
+  alert("Trade completed!");
+}
+
+// ======================
+// SEASON + PLAYOFFS
+// ======================
+let wins=0, losses=0, week=1;
+
+function playGame(){
+  let myOVR = avgOVR(myTeam.roster);
+  let opp = league[rand(0,31)];
+  let oppOVR = avgOVR(opp.roster);
+
+  let result = myOVR + rand(-10,10) > oppOVR;
+
+  if(result){ wins++; alert("You beat "+opp.name); }
+  else { losses++; alert("Lost to "+opp.name); }
+
+  week++;
+
+  if(week>10){
+    playoffs();
+  }
+}
+
+function avgOVR(r){
+  return r.reduce((a,b)=>a+b.ovr,0)/r.length;
+}
+
+function playoffs(){
+  if(wins < 6){
+    alert("Missed playoffs!");
+    resetSeason();
+    return;
+  }
+
+  let rounds = ["Wild Card","Divisional","Championship","Super Bowl"];
+
+  for(let r of rounds){
+    let win = Math.random() > 0.4;
+    if(!win){
+      alert("Eliminated in "+r);
+      resetSeason();
+      return;
     }
   }
 
-  if(qb.x>650) end(true);
+  alert("🏆 YOU WON THE CHAMPIONSHIP!");
+  resetSeason();
 }
 
-function end(win){
-  if(win) state.wins++;
-  else state.losses++;
-  state.week++;
-  save();
-
-  alert(win?"TOUCHDOWN!":"STOPPED!");
-
-  canvas.style.display="none";
-  document.getElementById("hub").style.display="block";
-  updateHub();
+function resetSeason(){
+  wins=0;
+  losses=0;
+  week=1;
 }
 
-function draw(){
-  ctx.fillStyle="#083";
-  ctx.fillRect(0,0,700,350);
+// ======================
+// SIMPLE HUB
+// ======================
+function hub(){
+  let choice = prompt(
+`W:${wins} L:${losses} Week:${week}
+Cap:$${myTeam.cap}
 
-  ctx.strokeStyle="white";
-  for(let i=0;i<700;i+=50){
-    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,350); ctx.stroke();
-  }
+1.Play Game
+2.Roster
+3.Free Agency
+4.Trade
+5.Settings`
+  );
 
-  ctx.fillStyle="yellow";
-  ctx.fillRect(qb.x,qb.y,14,14);
+  if(choice=="1") playGame();
+  if(choice=="2") viewRoster();
+  if(choice=="3") freeAgency();
+  if(choice=="4") trade();
+  if(choice=="5") openSettings();
 
-  ctx.fillStyle="lime";
-  ctx.fillRect(wr.x,wr.y,12,12);
-  ctx.fillRect(wr2.x,wr2.y,12,12);
-
-  ctx.fillStyle="white";
-  defenders.forEach(d=>ctx.fillRect(d.x,d.y,12,12));
-
-  if(aiming){
-    ctx.strokeStyle="red";
-    ctx.beginPath();
-    ctx.moveTo(qb.x,qb.y);
-    ctx.lineTo(wr.x,wr.y);
-    ctx.stroke();
-  }
+  setTimeout(hub,100);
 }
 
-function gameLoop(){
-  update();
-  draw();
-  requestAnimationFrame(gameLoop);
-}
+hub();
+</script>
 </script>
 
 </body>
