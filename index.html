@@ -5,43 +5,27 @@
 <title>Gridiron Legends</title>
 <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<!-- MENU -->
-<div id="menu" class="screen active">
-  <h1>🏈 GRIDIRON LEGENDS</h1>
-  <button onclick="go('game')">Play</button>
-  <button onclick="go('roster')">Roster</button>
-  <button onclick="go('trade')">Trade</button>
-  <button onclick="go('fa')">Free Agency</button>
-  <button onclick="toggleSandbox()">Sandbox</button>
+<div id="topbar">
+  <span>🏈 Gridiron Legends</span>
+  <span id="capSpace"></span>
 </div>
 
-<!-- GAME -->
+<div id="menu" class="screen active">
+  <h1>GRIDIRON LEGENDS</h1>
+  <button onclick="go('game')">Quick Play</button>
+  <button onclick="go('season')">Franchise</button>
+  <button onclick="go('career')">Career</button>
+</div>
+
 <div id="game" class="screen">
   <canvas id="c"></canvas>
-  <button class="back" onclick="go('menu')">Back</button>
+  <div id="hudMessage"></div>
+  <button onclick="go('menu')">Back</button>
 </div>
 
-<!-- ROSTER -->
-<div id="roster" class="screen">
-  <div id="rosterList" class="panel"></div>
-  <button class="back" onclick="go('menu')">Back</button>
-</div>
-
-<!-- TRADE -->
-<div id="trade" class="screen">
-  <div id="tradeList" class="panel"></div>
-  <button class="back" onclick="go('menu')">Back</button>
-</div>
-
-<!-- FREE AGENCY -->
-<div id="fa" class="screen">
-  <div id="faList" class="panel"></div>
-  <button class="back" onclick="go('menu')">Back</button>
-</div>
-
+<script src="sounds.js"></script>
 <script src="systems.js"></script>
 <script src="game.js"></script>
 
